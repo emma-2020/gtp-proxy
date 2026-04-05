@@ -1,0 +1,6 @@
+{
+  "name": "gold-trader-proxy",
+  "version": "1.0.0",
+  "description": "Serverless proxy for Gold Trader Pro — routes Anthropic API calls to avoid CORS",
+  "private": true
+}
