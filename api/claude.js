@@ -1,32 +1,37 @@
-// api/claude.js — Vercel serverless function
-// This runs SERVER-SIDE so CORS is not an issue
-// Deploy this to Vercel, then point your app at it
+// api/claude.js — Vercel Serverless Function
+// CommonJS syntax (no ES module issues)
+// This runs SERVER-SIDE — no CORS problems
 
-export default async function handler(req, res) {
-  // Allow requests from your GitHub Pages domain
-  res.setHeader('Access-Control-Allow-Origin', 'https://emma-2020.github.io');
+module.exports = async function handler(req, res) {
+
+  // CORS — allow any origin so GitHub Pages can call this
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  // Handle preflight
+  // Browser preflight check
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Use POST' });
   }
 
-  // Get your Anthropic key from Vercel environment variable (never exposed to browser)
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_KEY) {
-    return res.status(500).json({ error: 'Server not configured — add ANTHROPIC_API_KEY to Vercel env vars' });
+    return res.status(500).json({
+      error: 'ANTHROPIC_API_KEY not set. Go to Vercel → Project → Settings → Environment Variables and add it.'
+    });
   }
 
   try {
-    const { messages, max_tokens, system } = req.body;
+    const body = req.body || {};
+    if (!body.messages) {
+      return res.status(400).json({ error: 'Missing messages array in request body' });
+    }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -35,20 +40,19 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: max_tokens || 500,
-        system: system || 'You are a professional XAUUSD technical analyst.',
-        messages,
+        max_tokens: body.max_tokens || 500,
+        system: body.system || 'You are a professional XAUUSD technical analyst.',
+        messages: body.messages,
       }),
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json({ error: data?.error?.message || 'Anthropic API error' });
+    const data = await r.json();
+    if (!r.ok) {
+      return res.status(r.status).json({ error: data?.error?.message || 'Anthropic error', details: data });
     }
-
     return res.status(200).json(data);
+
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Proxy error: ' + err.message });
   }
-}
+};
